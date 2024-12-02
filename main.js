@@ -38,11 +38,11 @@ module.exports.loop = function () {
 
     // 检查并生成 creep，确保每种角色至少有2个，或者 builder 至少为4个，或者总数为8
     var totalCreeps = Object.keys(Game.creeps).length;
-    if (totalCreeps <= 14) {
+    if (totalCreeps <= 15) {
         checkAndSpawnCreep('harvester', [WORK,WORK,WORK,WORK,WORK,WORK,WORK,MOVE,MOVE], 1);
-        checkAndSpawnCreep('carrier', [CARRY,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE], 1);
+        // checkAndSpawnCreep('carrier', [CARRY,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE], 1);
         checkAndSpawnCreep('allfuner', [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE,MOVE], 5);
-        checkAndSpawnCreep('builder', [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE,MOVE], 2);
+        checkAndSpawnCreep('builder', [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE,MOVE], 4);
         checkAndSpawnCreep('upgrader', [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE,MOVE], 5);
         // checkAndSpawnCreep('explorer', [WORK,WORK,WORK,CARRY,CARRY,CARRY,CARRY,MOVE,MOVE,MOVE,MOVE,MOVE,MOVE], 3);        
         // checkAndSpawnCreep('destroyer', [ATTACK, MOVE], 2); // 假设 destroyer 需要攻击部件

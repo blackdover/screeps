@@ -1,35 +1,58 @@
- var roleBuilder={
+var roleBuilder = {
 
     run: function (creep) {
-        if (creep.memory.building && creep.store[RESOURCE_ENERGY] == 0) {
-            creep.memory.building = false;
+        // 如果能量为0，进入收集能量状态
+        if (creep.store[RESOURCE_ENERGY] == 0 && creep.memory.state !== 'collecting') {
+            creep.memory.state = 'collecting';
             creep.say('🔄 收集');
         }
 
-        if (!creep.memory.building && creep.store.getFreeCapacity() == 0) {
-            let target = this.getEnergyTransferTarget(creep);
-            if (target) {
-                if (creep.transfer(target, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' } });
-                }
-            } else {
-                creep.memory.building = true;
+        // 如果能量满了，进入建造或修理状态
+        if (creep.store.getFreeCapacity() == 0) {
+            if (creep.memory.state !== 'building') {
+                creep.memory.state = 'building';
                 creep.say('🚧 建造');
             }
         }
 
-        if (!creep.memory.building && creep.store.getFreeCapacity() > 0) {
-            this.collectEnergy(creep);
-        }
-
-        if (creep.memory.building) {
-            this.buildLogic(creep);
-        } else {
-            this.idleLogic(creep);
+        // 根据状态执行不同任务
+        switch (creep.memory.state) {
+            case 'collecting':
+                this.collectEnergy(creep);
+                break;
+            case 'building':
+                this.buildLogic(creep);
+                break;
+            case 'requiring':
+                this.repairLogic(creep);
+                break;
+            default:
+                creep.say('💤 等待');
+                break;
         }
     },
 
     collectEnergy: function (creep) {
+        // 优先捡取地面上的能量
+        let droppedEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
+            filter: (resource) => resource.resourceType == RESOURCE_ENERGY && resource.amount > 0
+        });
+
+        if (droppedEnergy.length > 0) {
+            // 找到最近的能量，并捡起
+            let target = droppedEnergy.sort((a, b) => {
+                return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
+            })[0];
+
+            if (creep.pos.isNearTo(target)) {
+                creep.pickup(target);
+            } else {
+                creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
+            }
+            return; // 捡起能量后退出，不再收集其他能量
+        }
+
+        // 如果没有能量在地面上，继续收集容器或矿源中的能量
         let energySources = creep.room.find(FIND_SOURCES);
         energySources = energySources.concat(creep.room.find(FIND_STRUCTURES, {
             filter: (s) => s.structureType == STRUCTURE_CONTAINER && s.store[RESOURCE_ENERGY] > 0
@@ -56,42 +79,89 @@
     },
 
     buildLogic: function (creep) {
+        // 查找所有建造任务
         let sites = creep.room.find(FIND_CONSTRUCTION_SITES);
         if (sites.length == 0) {
-            creep.memory.building = false;
-            creep.say('💤 休息');
+            // 如果没有建造任务，切换到维修状态
+            this.repairLogic(creep);
             return;
         }
 
-        let targetSite = sites.sort((a, b) => {
-            return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
-        })[0];
+        // 给不同建筑类型设定优先级
+        const buildPriorityMap = {
+            [STRUCTURE_SPAWN]: 1,
+            [STRUCTURE_EXTENSION]: 2,
+            [STRUCTURE_CONTAINER]: 3,
+            [STRUCTURE_TOWER]: 4,
+            [STRUCTURE_RAMPART]: 5,
+            [STRUCTURE_WALL]: 6
+        };
+
+        // 按照优先级排序建筑
+        sites = sites.sort((a, b) => {
+            // 先比较建筑类型优先级，如果相同，再按距离排序
+            let priorityA = buildPriorityMap[a.structureType] || 100;
+            let priorityB = buildPriorityMap[b.structureType] || 100;
+
+            if (priorityA === priorityB) {
+                return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
+            }
+
+            return priorityA - priorityB;
+        });
+
+        // 选择排序后的第一个建筑进行建造
+        let targetSite = sites[0];
 
         if (creep.build(targetSite) == ERR_NOT_IN_RANGE) {
             creep.moveTo(targetSite, { visualizePathStyle: { stroke: '#ffffff' } });
         }
+        // 不需要切换到 'requiring'，只需保持在建造状态，直到有需要维修的建筑
     },
 
-    getEnergyTransferTarget: function (creep) {
-        let target = creep.room.find(FIND_STRUCTURES, {
-            filter: (s) => s.structureType == STRUCTURE_EXTENSION && s.store[RESOURCE_ENERGY] < s.store.getCapacity(RESOURCE_ENERGY)
-        })[0];
+    repairLogic: function (creep) {
+        // 查找所有需要维修的建筑
+        let structuresToRepair = creep.room.find(FIND_STRUCTURES, {
+            filter: (structure) => structure.hits < structure.hitsMax
+        });
 
-        if (!target) {
-            target = creep.room.find(FIND_STRUCTURES, {
-                filter: (s) => s.structureType == STRUCTURE_SPAWN && s.store[RESOURCE_ENERGY] < s.store.getCapacity(RESOURCE_ENERGY)
-            })[0];
+        if (structuresToRepair.length == 0) {
+            creep.memory.state = 'collecting'; // 如果没有需要修理的物品，回收能量
+            return;
         }
 
-        return target;
-    },
+        // 给不同建筑类型设定优先级
+        const repairPriorityMap = {
+            [STRUCTURE_CONTAINER]: 6,
+            [STRUCTURE_SPAWN]: 2,
+            [STRUCTURE_EXTENSION]: 3,
+            [STRUCTURE_RAMPART]: 4,
+            [STRUCTURE_TOWER]: 5,
+            [STRUCTURE_ROAD]: 6,
+            [STRUCTURE_WALL]: 7,
+        };
 
-    idleLogic: function (creep) {
-        let spawn = creep.room.find(FIND_STRUCTURES, { filter: (s) => s.structureType == STRUCTURE_SPAWN })[0];
-        if (spawn) {
-            creep.moveTo(spawn, { visualizePathStyle: { stroke: '#ff0000' } });
+        // 按照优先级和损坏程度进行排序
+        structuresToRepair = structuresToRepair.sort((a, b) => {
+            // 先比较优先级，再比较损坏比例
+            let priorityA = repairPriorityMap[a.structureType] || 100;
+            let priorityB = repairPriorityMap[b.structureType] || 100;
+
+            // 优先级较高的先修复，优先级相同的按损坏比例排序
+            if (priorityA === priorityB) {
+                return (a.hits / a.hitsMax) - (b.hits / b.hitsMax); // 损坏比例
+            }
+            return priorityA - priorityB; // 优先级排序
+        });
+
+        // 选择排序后的第一个结构进行修复
+        let target = structuresToRepair[0];
+
+        if (creep.repair(target) == ERR_NOT_IN_RANGE) {
+            creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
         }
     },
+
 };
 
-module.exports =roleBuilder;
+module.exports = roleBuilder;

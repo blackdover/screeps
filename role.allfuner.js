@@ -135,17 +135,7 @@ var roleAllFuner = {
 
 // 定义获取能量目标的函数
 function getEnergyTarget(creep) {
-    // 优先查找需要能量的 Spawn
-    var spawnTargets = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-        filter: (structure) => {
-            return structure.structureType === STRUCTURE_SPAWN &&
-                   structure.store[RESOURCE_ENERGY] < structure.store.getCapacity(RESOURCE_ENERGY);
-        }
-    });
-    if (spawnTargets) {
-        return spawnTargets;
-    }
-    // 如果没有，查找需要能量的 Extension
+    // 优先查找需要能量的 Extension
     var extensionTargets = creep.pos.findClosestByPath(FIND_STRUCTURES, {
         filter: (structure) => {
             return structure.structureType === STRUCTURE_EXTENSION &&
@@ -155,6 +145,18 @@ function getEnergyTarget(creep) {
     if (extensionTargets) {
         return extensionTargets;
     }
+
+    // 如果没有，查找需要能量的 Spawn
+    var spawnTargets = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+        filter: (structure) => {
+            return structure.structureType === STRUCTURE_SPAWN &&
+                   structure.store[RESOURCE_ENERGY] < structure.store.getCapacity(RESOURCE_ENERGY);
+        }
+    });
+    if (spawnTargets) {
+        return spawnTargets;
+    }
+
     // 如果没有，查找需要能量的 Container
     // var containerTargets = creep.pos.findClosestByPath(FIND_STRUCTURES, {
     //     filter: (structure) => {
@@ -165,8 +167,10 @@ function getEnergyTarget(creep) {
     // if (containerTargets) {
     //     return containerTargets;
     // }
+
     // 没有需要能量的目标
     return null;
 }
+
 
 module.exports = roleAllFuner;
