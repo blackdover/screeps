@@ -168,6 +168,17 @@ function getEnergyTarget(creep) {
     //     return containerTargets;
     // }
 
+    //   如果没有，查找需要能量的 storage
+    var storageTargets = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+        filter: (structure) => {
+            return structure.structureType === STRUCTURE_STORAGE &&
+                   structure.store[RESOURCE_ENERGY] < structure.store.getCapacity(RESOURCE_ENERGY);
+        }
+    });
+    if (storageTargets) {
+        return storageTargets;
+    }  
+
     // 没有需要能量的目标
     return null;
 }
