@@ -52,31 +52,57 @@ var roleBuilder = {
             return; // 捡起能量后退出，不再收集其他能量
         }
 
-        // 如果没有能量在地面上，继续收集容器或矿源中的能量
-        let energySources = creep.room.find(FIND_SOURCES);
-        energySources = energySources.concat(creep.room.find(FIND_STRUCTURES, {
-            filter: (s) => s.structureType == STRUCTURE_CONTAINER && s.store[RESOURCE_ENERGY] > 0
-        }));
+        // 其次查找storage中的能量
+        let storages = creep.room.find(FIND_STRUCTURES, {
+            filter: (s) => s.structureType == STRUCTURE_STORAGE && s.store[RESOURCE_ENERGY] > 0
+        });
 
-        if (energySources.length == 0) {
-            creep.say('_No Energy');
-            return;
-        }
+        if (storages.length > 0) {
+            // 提取storage中的能量
+            let target = storages.sort((a, b) => {
+                return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
+            })[0];
 
-        let target = energySources.sort((a, b) => {
-            return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
-        })[0];
-
-        if (creep.pos.isNearTo(target)) {
-            if (target.structureType == STRUCTURE_CONTAINER) {
+            if (creep.pos.isNearTo(target)) {
                 creep.withdraw(target, RESOURCE_ENERGY);
             } else {
-                creep.harvest(target);
+                creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
+            }
+            return; // 从storage中提取能量后退出，不再查找container
+        }
+
+        // 最后查找容器中的能量
+        let energySources = creep.room.find(FIND_STRUCTURES, {
+            filter: (s) => s.structureType == STRUCTURE_CONTAINER && s.store[RESOURCE_ENERGY] > 0
+        });
+
+        if (energySources.length > 0) {
+            // 采集容器中的能量
+            let target = energySources.sort((a, b) => {
+                return creep.pos.getRangeTo(a) - creep.pos.getRangeTo(b);
+            })[0];
+
+            if (creep.pos.isNearTo(target)) {
+                creep.withdraw(target, RESOURCE_ENERGY);
+            } else {
+                creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
             }
         } else {
-            creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
+            // 寻找资源点，排除指定ID的资源点
+            var sources = creep.room.find(FIND_SOURCES, {
+                filter: (source) => source.id != '5bbcafdc9099fc012e63b4c5'
+            });
+            if (sources.length > 0) {
+                var closestSource = creep.pos.findClosestByPath(sources);
+                if (creep.harvest(closestSource) == ERR_NOT_IN_RANGE) {
+                    creep.moveTo(closestSource, { visualizePathStyle: { stroke: '#ffaa00' } });
+                }
+            } else {
+                creep.say('No Energy');
+            }
         }
     },
+
 
     buildLogic: function (creep) {
         // 查找所有建造任务
@@ -132,13 +158,13 @@ var roleBuilder = {
 
         // 给不同建筑类型设定优先级
         const repairPriorityMap = {
-            [STRUCTURE_CONTAINER]: 6,
-            [STRUCTURE_SPAWN]: 2,
-            [STRUCTURE_EXTENSION]: 3,
-            [STRUCTURE_RAMPART]: 4,
-            [STRUCTURE_TOWER]: 5,
-            [STRUCTURE_ROAD]: 6,
-            [STRUCTURE_WALL]: 7,
+            [STRUCTURE_CONTAINER]: 1,
+            // [STRUCTURE_SPAWN]: 2,
+            // [STRUCTURE_EXTENSION]: 2,
+            [STRUCTURE_RAMPART]: 3,
+            // [STRUCTURE_TOWER]: 4,
+            [STRUCTURE_ROAD]: 5,
+            [STRUCTURE_WALL]: 6,
         };
 
         // 按照优先级和损坏程度进行排序
