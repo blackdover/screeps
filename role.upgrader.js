@@ -20,7 +20,9 @@ var roleUpgrader = {
         } else {
             // 采集能量逻辑
             var containers = creep.room.find(FIND_STRUCTURES, {
-                filter: (structure) => structure.structureType == STRUCTURE_CONTAINER && structure.store[RESOURCE_ENERGY] > 0
+                filter: (structure) =>
+                    // structure.structureType == STRUCTURE_CONTAINER ||
+                    structure.structureType == STRUCTURE_STORAGE && structure.store[RESOURCE_ENERGY] > 0
             });
             var closestContainer = creep.pos.findClosestByPath(containers);
             if (closestContainer) {
