@@ -1,45 +1,62 @@
 var roleAttacker = {
-    /** @param {Creep} creep **/
+
     run: function(creep) {
-        // 如果 Creep 没有能量，从 Extension 提取能量
-        if (creep.store[RESOURCE_ENERGY] === 0) {
-            var extension = creep.pos.findClosestByPath(FIND_MY_STRUCTURES, {
-                filter: (structure) => structure.structureType == STRUCTURE_EXTENSION &&
-                                       structure.store[RESOURCE_ENERGY] > 0
-            });
-            if (extension) {
-                if (creep.withdraw(extension, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
-                    creep.moveTo(extension, { visualizePathStyle: { stroke: '#ffaa00' } });
-                }
-            }
-        } 
-        // 如果 Creep 已经攻击过，则进入“转圈”状态，不再主动攻击
-        else if (creep.memory.state === 'attacked') {
-            // 在敌方区域内转圈
-            var randomDirection = Math.floor(Math.random() * 8);  // 随机方向（8个方向）
-            creep.move(randomDirection);
+        if (!creep.memory.state) {
+            creep.memory.state = 'collecting';
         }
-        else {
-            // 查找敌方 Creep
-            var hostileCreep = creep.pos.findClosestByRange(FIND_HOSTILE_CREEPS);
-            if (hostileCreep) {
-                if (creep.attack(hostileCreep) == OK) {
-                    creep.memory.state = 'attacked'; // 标记为已经攻击过
-                } else {
-                    creep.moveTo(hostileCreep, { visualizePathStyle: { stroke: '#ff0000' } });
-                }
-            } 
-            // 查找敌方建筑
-            else {
-                var hostileStructure = creep.pos.findClosestByRange(FIND_HOSTILE_STRUCTURES);
-                if (hostileStructure) {
-                    if (creep.attack(hostileStructure) == OK) {
-                        creep.memory.state = 'attacked'; // 标记为已经攻击过
+
+        switch(creep.memory.state) {
+            case 'collecting':
+                // Find the nearest container with energy
+                var containers = creep.room.find(FIND_STRUCTURES, {
+                    filter: (structure) => structure.structureType == STRUCTURE_CONTAINER && structure.store[RESOURCE_ENERGY] > 0
+                });
+                if (containers.length > 0) {
+                    var container = creep.pos.findClosestByPath(containers);
+                    if (creep.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        if (creep.withdraw(container, RESOURCE_ENERGY) == ERR_NOT_IN_RANGE) {
+                            creep.moveTo(container, { visualizePathStyle: { stroke: '#ffaa00' } });
+                        }
                     } else {
-                        creep.moveTo(hostileStructure, { visualizePathStyle: { stroke: '#ff0000' } });
+                        creep.memory.state = 'moving';
+                    }
+                } else {
+                    // No containers with energy, go idle
+                    creep.memory.state = 'idle';
+                }
+                break;
+            case 'moving':
+                // Move to position (15,2)
+                if (creep.pos.x != 15 || creep.pos.y != 2) {
+                    creep.moveTo(15, 3, { visualizePathStyle: { stroke: '#ffffff' } });
+                } else {
+                    creep.memory.state = 'attacking';
+                }
+                break;
+            case 'attacking':
+                // Find NPCs (neutral creeps) to attack
+                var npcs = creep.room.find(FIND_HOSTILE_CREEPS, {
+                    filter: (creep) => creep.owner && creep.owner.username == 'Neutral'
+                });
+                if (npcs.length > 0) {
+                    var target = creep.pos.findClosestByPath(npcs);
+                    if (creep.attack(target) == ERR_NOT_IN_RANGE) {
+                        creep.moveTo(target, { visualizePathStyle: { stroke: '#ff0000' } });
+                    }
+                } else {
+                    // No NPCs to attack
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) == 0) {
+                        // If no energy, go back to collecting
+                        creep.memory.state = 'collecting';
+                    } else {
+                        // Still has energy, wait for NPCs
                     }
                 }
-            }
+                break;
+            case 'idle':
+                // Handle idle state, look for other tasks
+                // For now, just wait
+                break;
         }
     }
 };
